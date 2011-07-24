@@ -5,7 +5,7 @@
 // @include        http://*.wizards.com/*
 // @include        http://*.mananation.com/*
 // @include        http://*.gatheringmagic.com/*
-// @require	   http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js
+// @require	   https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
 // @require	   https://github.com/malsup/corner/raw/master/jquery.corner.js
 // @require    http://usocheckup.redirectme.net/84942.js
 // @version	   1.9.0
@@ -14,63 +14,70 @@
 
 
 function GM_XHR() {
-	this.type = null;
-	this.url = null;
-	this.async = null;
-	this.username = null;
-	this.password = null;
-	this.status = null;
-	this.headers = {};
-	this.readyState = null;
+    this.type = null;
+    this.url = null;
+    this.async = null;
+    this.username = null;
+    this.password = null;
+    this.status = null;
+    this.headers = {};
+    this.readyState = null;
 
-	this.open = function (type, url, async, username, password) {
-		this.type = type ? type : null;
-		this.url = url ? url : null;
-		this.async = async ? async : null;
-		this.username = username ? username : null;
-		this.password = password ? password : null;
-		this.readyState = 1;
-	};
+    this.abort = function() {
+        this.readyState = 0;
+    };
 
-	this.setRequestHeader = function (name, value) {
-		this.headers[name] = value;
-	};
+    this.getAllResponseHeaders = function(name) {
+      if (this.readyState!=4) return "";
+      return this.responseHeaders;
+    };
 
-	this.abort = function () {
-		this.readyState = 0;
-	};
+    this.getResponseHeader = function(name) {
+      var regexp = new RegExp('^'+name+': (.*)$','im');
+      var match = regexp.exec(this.responseHeaders);
+      if (match) { return match[1]; }
+      return '';
+    };
 
-	this.getResponseHeader = function (name) {
-		return this.headers[name];
-	};
+    this.open = function(type, url, async, username, password) {
+        this.type = type ? type : null;
+        this.url = url ? url : null;
+        this.async = async ? async : null;
+        this.username = username ? username : null;
+        this.password = password ? password : null;
+        this.readyState = 1;
+    };
+    
+    this.setRequestHeader = function(name, value) {
+        this.headers[name] = value;
+    };
 
-	this.send = function (data) {
-		this.data = data;
-		var that = this;
-		GM_xmlhttpRequest({
-			method: this.type,
-			url: this.url,
-			headers: this.headers,
-			data: this.data,
-			onload: function (rsp) {
-				// Populate wrapper object with returned data
-				for (var k in rsp) {
-					that[k] = rsp[k];
-				}
-			},
-			onerror: function (rsp) {
-				for (var k in rsp) {
-					that[k] = rsp[k];
-				}
-			},
-			onreadystatechange: function (rsp) {
-				for (var k in rsp) {
-					that[k] = rsp[k];
-				}
-			}
-		});
-	};
-}
+    this.send = function(data) {
+        this.data = data;
+        var that = this;
+        // http://wiki.greasespot.net/GM_xmlhttpRequest
+        GM_xmlhttpRequest({
+            method: this.type,
+            url: this.url,
+            headers: this.headers,
+            data: this.data,
+            onload: function(rsp) {
+                // Populate wrapper object with returned data
+                // including the Greasemonkey specific "responseHeaders"
+                for (k in rsp) {
+                    that[k] = rsp[k];
+                }
+                // now we call onreadystatechange
+                that.onreadystatechange();
+            },
+            onerror: function(rsp) {
+                for (k in rsp) {
+                    that[k] = rsp[k];
+                }
+            }
+        });
+    };
+};
 
 $.ajaxSetup({
 	xhr: function () {
@@ -402,7 +409,7 @@ $.ajaxSetup({
 		$.ajax({
 			url: url,
 			dataType: dataType,
-			beforeSend: function (xhr) {
+			beforeSend: function (xhr, settings) {
 				REQUESTS_[id] = xhr;
 			},
 			complete: function (xhr, status) {
